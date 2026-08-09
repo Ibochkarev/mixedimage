@@ -494,8 +494,8 @@ mixedimage.buildCropperOptions = function (field, dataWidthEl, dataHeightEl) {
     var defaults = {
         aspectRatio: ratio,
         minCanvasWidth: 300,
-        minCropBoxWidth: field.crop_width,
-        minCropBoxHeight: field.crop_height,
+        minCropBoxWidth: parseInt(field.crop_width, 10) || 0,
+        minCropBoxHeight: parseInt(field.crop_height, 10) || 0,
         zoomOnWheel: false,
         viewMode: 1,
         crop: function (e) {
@@ -508,7 +508,7 @@ mixedimage.buildCropperOptions = function (field, dataWidthEl, dataHeightEl) {
     return Ext.apply(defaults, mixedimage.parseCropOptions(field.crop_options));
 };
 
-mixedimage.saveCroppedBlob = function (field, blob) {
+mixedimage.saveCroppedBlob = function (field, blob, onComplete) {
     var reader = new FileReader();
     reader.onloadend = function () {
         Ext.Ajax.request({
@@ -517,14 +517,26 @@ mixedimage.saveCroppedBlob = function (field, blob) {
                 file: reader.result,
                 action: 'file/crop',
                 ctx_path: field.ctx_path,
-                value: field.value,
+                value: field.getValue(),
                 source: field.source,
                 suffix: field.crop_suffix,
-                tvId: field.tvId
+                tvId: field.tvId,
+                HTTP_MODAUTH: MODx.siteId
             },
             success: function (response) {
-                field.setValueInput(response.responseText);
+                var result = Ext.util.JSON.decode(response.responseText);
+
+                if (!result || !result.success) {
+                    MODx.msg.alert('Error', (result && result.message) || _('mixedimage.err_crop_save'));
+                    return;
+                }
+
+                field.setValueInput(result.message);
                 MODx.fireResourceFormChange();
+
+                if (typeof onComplete === 'function') {
+                    onComplete();
+                }
             },
             failure: function () {
                 MODx.msg.alert('Error', _('mixedimage.err_crop_save'));
@@ -722,17 +734,17 @@ Ext.extend(mixedimage.trigger, Ext.form.TriggerField, {
                             var win = triggerField.windowCrop;
                             var mime = mixedimage.getSourceMime(triggerField.value);
                             var canvas = win.cropper.getCroppedCanvas({
-                                width: triggerField.crop_width,
-                                height: triggerField.crop_height,
+                                width: parseInt(triggerField.crop_width, 10) || undefined,
+                                height: parseInt(triggerField.crop_height, 10) || undefined,
                                 maxWidth: 1000,
                                 maxHeight: 1000
                             });
 
                             canvas.toBlob(function (blob) {
-                                mixedimage.saveCroppedBlob(triggerField, blob);
+                                mixedimage.saveCroppedBlob(triggerField, blob, function () {
+                                    win.hide();
+                                });
                             }, mime);
-
-                            win.hide();
                         }
                     },
                     {

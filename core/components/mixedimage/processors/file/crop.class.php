@@ -57,7 +57,7 @@ class mixedimageCropProcessor extends modProcessor
             'tvId' => $this->getProperty('tvId'),
         ]);
 
-        return $relativePath;
+        return $this->success($relativePath);
     }
 
     private function decodeDataUri($dataUri)
